@@ -33,21 +33,24 @@
 - `/compare` Side-by-side comparison
 - `/login`, `/register`
 
-## What's been implemented (Feb 14, 2026)
+## What's been implemented (through Feb 14, 2026 — iterations 1–3)
 - ✅ JWT email/password auth + Emergent Google session bridge
 - ✅ MongoDB models with UUID `user_id` (no ObjectId leakage), unique indexes
-- ✅ Seed script: 20 companies, ~351 templated jobs, 30 demo applicants, 204 demo applications, admin + demo accounts
-- ✅ Real data ingestion: RemoteOK (19 jobs) + Greenhouse (756 jobs from Stripe, Airbnb, Anthropic, Databricks, Vercel)
+- ✅ Seed script: 20 companies, ~351 templated jobs, 30 demo applicants, demo applications, admin + demo accounts
+- ✅ Real data ingestion: **RemoteOK + Greenhouse + Lever + YC/HN** = 1,400+ active jobs across 97 companies (auto-refresh every 6h via background scheduler)
 - ✅ Aggregation endpoints: `/api/jobs-city/buildings` and `/api/applicants-city/buildings`
-- ✅ 3D Jobs City — extruded USA polygon, company buildings clustered per city with spiral layout, dusk lighting, city label rings
-- ✅ 3D Applicants City — cyan grid floor, voxel towers colored by experience level (blue/amber/red), GitHub antennas, night palette
+- ✅ 3D Jobs City — extruded USA polygon, **InstancedMesh** for short buildings, **multi-tier skyscrapers with spires for tall buildings (≥8 floors)**, dusk lighting, city label rings, search-bar dim
+- ✅ 3D Applicants City — cyan grid floor, voxel towers colored by experience level, **multi-tier skyscrapers for power users (≥8 applications)**, GitHub antennas, night palette, search-bar dim by name/level/github
 - ✅ Apply flow with duplicate prevention, cover note, toast feedback
-- ✅ Profile page with my-building link + applications list
+- ✅ AI match score on `/jobs/:id` — Claude Sonnet 4.5 via Emergent LLM key, 24h cache
+- ✅ GitHub link on `/profile` — paste a username, public events API counts last-30-day commits and updates the antenna
+- ✅ Profile page with my-building link, GitHub form, stat tiles, applications list
 - ✅ Compare page with bar charts and top-companies stats
 - ✅ Landing page with dual-image hero, glass-morphism, Unbounded + Outfit + JetBrains Mono fonts
 - ✅ NavBar with sign-in/out/profile links
 - ✅ r3f patched to ignore `x-*` JSX props injected by visual-edits babel plugin
-- ✅ Testing agent run: 14/14 backend pytest + Playwright e2e all green
+- ✅ Deployment health check: PASS
+- ✅ Testing agent runs: **iter_1 (14/14 + e2e)**, **iter_2 (25/25 + e2e)**, **iter_3 (7/7 skyscraper + search e2e)** — all green
 
 ## Test credentials
 - `demo@jobcity.app` / `Demo123!` (applicant, 5 applications)
@@ -60,12 +63,12 @@
 - [x] Auth, seed, ingestion, jobs-city, applicants-city, apply, profile, compare, navbar
 
 ### P1 — Next features
-- [x] ~~Search/filter bars wired into 3D cities~~ (Jobs City done)
+- [x] ~~Search/filter bars wired into 3D cities~~ (Jobs City + Applicants City both done)
 - [x] ~~Lever + YC/HN public ingestion sources~~
 - [x] ~~Background scheduled ingestion via FastAPI~~ (6h)
 - [x] ~~GitHub linking + commit count sync~~ (public API, no OAuth)
 - [x] ~~InstancedMesh refactor for cities with > 500 buildings~~ (perf)
-- [ ] Search bar wired in Applicants City (same pattern)
+- [x] ~~Multi-tier skyscraper geometry for tall buildings~~ (both cities, ≥8 floors)
 - [ ] LinkedIn / Indeed (no public APIs available — defer or scrape)
 - [ ] Mobile-detection → simplified scene (no shadows, no Stars)
 - [ ] Pagination/virtualization for applicants when count > 500
