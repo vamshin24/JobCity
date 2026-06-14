@@ -60,7 +60,20 @@ async def get_applicant(applicant_id: str):
 async def applicants_city_buildings():
     """Return the 3D grid data for the Applicants City."""
     db = get_db()
-    cursor = db.applicants.find({}, {"_id": 0})
+    cursor = db.applicants.find(
+        {},
+        {
+            "_id": 0,
+            "applicant_id": 1,
+            "display_name": 1,
+            "applications_count": 1,
+            "experience_level": 1,
+            "github_username": 1,
+            "github_commits_30d": 1,
+            "building_seed": 1,
+            "avatar_url": 1,
+        },
+    )
     items = await cursor.to_list(length=2000)
     out = []
     for a in items:

@@ -10,13 +10,43 @@ router = APIRouter(prefix="/api/companies", tags=["companies"])
 @router.get("")
 async def list_companies(q: Optional[str] = None, limit: int = Query(100, le=200)):
     db = get_db()
-    query: dict = {}
+    match: dict = {}
     if q:
-        query["name"] = {"$regex": q, "$options": "i"}
-    items = await db.companies.find(query, {"_id": 0}).sort("name", 1).limit(limit).to_list(length=limit)
-    # attach job count quickly
-    for c in items:
-        c["jobs_count"] = await db.jobs.count_documents({"company_id": c["company_id"], "is_active": True})
+        match["name"] = {"$regex": q, "$options": "i"}
+    pipeline = [
+        {"$match": match} if match else {"$match": {}},
+        {"$sort": {"name": 1}},
+        {"$limit": limit},
+        {
+            "$lookup": {
+                "from": "jobs",
+                "let": {"cid": "$company_id"},
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$expr": {
+                                "$and": [
+                                    {"$eq": ["$company_id", "$$cid"]},
+                                    {"$eq": ["$is_active", True]},
+                                ]
+                            }
+                        }
+                    },
+                    {"$count": "n"},
+                ],
+                "as": "_job_count",
+            }
+        },
+        {
+            "$addFields": {
+                "jobs_count": {
+                    "$ifNull": [{"$arrayElemAt": ["$_job_count.n", 0]}, 0]
+                }
+            }
+        },
+        {"$project": {"_id": 0, "_job_count": 0}},
+    ]
+    items = await db.companies.aggregate(pipeline).to_list(length=limit)
     return {"items": items}
 
 
