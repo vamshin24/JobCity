@@ -60,14 +60,30 @@
 - [x] Auth, seed, ingestion, jobs-city, applicants-city, apply, profile, compare, navbar
 
 ### P1 — Next features
-- [ ] Search/filter bars wired into 3D cities (search input already exists in Jobs City UI — filter buildings/highlight on match)
-- [ ] LinkedIn/Indeed/YC public ingestion sources
-- [ ] GitHub OAuth linking + automatic commit count sync
-- [ ] InstancedMesh refactor for cities with > 500 buildings (perf)
+- [x] ~~Search/filter bars wired into 3D cities~~ (Jobs City done)
+- [x] ~~Lever + YC/HN public ingestion sources~~
+- [x] ~~Background scheduled ingestion via FastAPI~~ (6h)
+- [x] ~~GitHub linking + commit count sync~~ (public API, no OAuth)
+- [x] ~~InstancedMesh refactor for cities with > 500 buildings~~ (perf)
+- [ ] Search bar wired in Applicants City (same pattern)
+- [ ] LinkedIn / Indeed (no public APIs available — defer or scrape)
 - [ ] Mobile-detection → simplified scene (no shadows, no Stars)
 - [ ] Pagination/virtualization for applicants when count > 500
-- [ ] Background scheduled ingestion via FastAPI BackgroundTasks (refresh every 6h)
 - [ ] Email verification + password reset
+- [ ] Public share cards ("my JobCity building" PNG)
+
+### P2 — Intelligence layer
+- [x] ~~Claude Sonnet 4.5 job-match score~~ (24h cached)
+- [ ] Resume upload (object storage) → parse → auto-fill profile + skills
+- [ ] Recommended jobs panel (pre-compute match for top-10 jobs nightly)
+- [ ] Weekly Top Hiring City leaderboard
+- [ ] Achievement badges on top of buildings
+- [ ] Recruiter persona with saved searches
+
+## Known constraints
+- Preview Cloudflare proxy overrides `Access-Control-Allow-Origin` to `*` with credentials; we rely on Bearer header for programmatic calls, cookies for browser session.
+- visual-edits babel plugin injects `x-*` attributes on every JSX element in dev; node_modules patch is applied at `/app/frontend/scripts/patch-r3f.sh` (run after any `yarn install`).
+ reset
 - [ ] Public share cards ("my JobCity building" PNG)
 
 ### P2 — Intelligence layer
