@@ -16,3 +16,14 @@ export const EXP_COLORS = {
   mid: "#F5A623",
   senior: "#D0021B",
 };
+
+/**
+ * Bright lo-fi palette used in the Applicants City green scene.
+ * Each color is high-luminance so no tower ever reads as solid black
+ * against the dark forest-green ground/sky.
+ */
+export const APPLICANT_CITY_COLORS = {
+  entry: "#5BE3A3",  // bright mint
+  mid: "#F5D547",    // amber/yellow
+  senior: "#FF7A59", // warm orange-red
+};

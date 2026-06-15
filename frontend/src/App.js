@@ -11,6 +11,7 @@ import ApplicantDetail from "@/pages/ApplicantDetail";
 import Profile from "@/pages/Profile";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
+import Onboarding from "@/pages/Onboarding";
 import Compare from "@/pages/Compare";
 import { Toaster } from "sonner";
 
@@ -32,6 +33,14 @@ function ShellRoutes() {
         <Route path="/compare" element={<Compare />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route
+          path="/onboarding"
+          element={
+            <ProtectedRoute>
+              <Onboarding />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/profile"
           element={

@@ -56,10 +56,27 @@
 - ✅ Restored missing `.env` files (backend + frontend) after fork, added `.env.example` templates
 - ✅ JobDetail UX overhaul: AI brief (summary + required/nice-to-have skills) auto-loads on mount; "Score me" button removed; external Apply opens job portal in new tab; "Did you apply?" `AlertDialog` triggers on tab return via `visibilitychange` + `focus` listeners; seed jobs without `source_url` skip new-tab and open dialog directly
 - ✅ New `ApplicantRoads` component: horizontal + vertical asphalt strips with cyan neon center stripes form a grid between applicant towers (24×24, spacing 2.4)
-- ✅ Brightened dim applicant buildings (`multiplyScalar(0.6)` instead of crushing toward black) so they remain visible under search-dim
 - ✅ Emergent LLM Key wired in — `/api/jobs/{id}/summary` and `/api/jobs/{id}/match-score` confirmed live with Claude Sonnet 4.5
 - ✅ Login.jsx defaults aligned with seed (`demo@jobcity.test` / `Demo123!`)
 - ✅ Visually verified via screenshot tool (frontend testing agent struggles with WebGL canvases)
+
+## Iteration 5 — Feb 15, 2026 (this session continued)
+- ✅ **CORS fix**: switched API axios client to `withCredentials: false` so Cloudflare's `Access-Control-Allow-Origin: *` override no longer breaks credentials-mode preflight in Emergent preview. Auth still works via Bearer token in localStorage.
+- ✅ **Applicants City revamp** — Sheet drawer side panel replaces nav to `/applicants/:id`; shows title, applications count, skills, GitHub stats, and clickable resume link only (no jobs list)
+- ✅ **Compare flow** — click = open side panel (focus glow only, no auto-select). "+ Add to compare" button in the side panel stacks up to 4 applicants; floating dock at the bottom shows chips with remove-X + "Compare side-by-side →" CTA
+- ✅ **Navigate to my tower** — top-right CTA visible only when logged in. Smoothly tweens camera + orbit-controls target to the user's building (ease-out cubic over ~1.25s) and opens its side panel.
+- ✅ **New `/onboarding` page** — collected after register: title (with suggestion chips), experience level toggle, skills (chip multi-input), resume URL. All fields optional with "Skip for now". Backed by `PATCH /api/applicants/me`.
+- ✅ Register flow now redirects to `/onboarding` instead of `/profile`.
+- ✅ **Visual overhaul** of Applicants City to match the user's "pixelated lo-fi green night-city" reference:
+  - Background `#091a12` (deep forest-green), fog matched
+  - New `APPLICANT_CITY_COLORS` palette — bright mint/amber/orange so no building is invisible
+  - Brighter dim multiplier (`× 0.7` instead of `× 0.6`) — towers never read as black
+  - New `getGreenWindowTexture()` — pixelated `NearestFilter` neon-green / amber / dark-green window grid
+  - Skyscrapers in Applicants City now accept `variant="green"` to use the same lo-fi texture
+  - Roads now use dark forest-green base with neon-green stripes
+- ✅ Backend `PATCH /api/applicants/me` endpoint accepts `title`, `headline`, `skills`, `resume_url`, `experience_level`
+- ✅ Applicants schema gains `title` and `resume_url` (both optional)
+- ✅ `/api/applicants-city/buildings` response now includes `title` so it shows on hover tooltip + side panel
 
 ## Test credentials
 - `demo@jobcity.app` / `Demo123!` (applicant, 5 applications)

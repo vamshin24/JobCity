@@ -22,7 +22,7 @@ export default function RegisterPage() {
     setBusy(true);
     try {
       await register(email, password, name || email.split("@")[0]);
-      nav("/profile");
+      nav("/onboarding");
     } catch (e) {
       setErr(formatApiErrorDetail(e.response?.data?.detail) || e.message);
     } finally {

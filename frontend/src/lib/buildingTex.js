@@ -1,6 +1,7 @@
 import * as THREE from "three";
 
 let _cached = null;
+let _cachedGreen = null;
 
 /**
  * Build a tileable building-windows texture procedurally with a canvas.
@@ -41,6 +42,64 @@ export function getWindowTexture() {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
   _cached = tex;
+  return tex;
+}
+
+/**
+ * Lo-fi pixelated green-city window texture for Applicants City.
+ * Wider window blocks with strong neon-green/yellow lit pixels and dark
+ * forest-green wall — matches the cyber-pixel-city aesthetic.
+ */
+export function getGreenWindowTexture() {
+  if (_cachedGreen) return _cachedGreen;
+  const size = 128; // smaller = more pixelated when scaled across face
+  const c = document.createElement("canvas");
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext("2d");
+  // Dark forest-green wall base
+  ctx.fillStyle = "#0e2418";
+  ctx.fillRect(0, 0, size, size);
+
+  const cols = 6;
+  const rows = 10;
+  const wW = size / cols;
+  const wH = size / rows;
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const r = Math.random();
+      let fill;
+      if (r > 0.55) {
+        // bright neon green
+        fill = "rgba(120, 255, 110, 1)";
+      } else if (r > 0.3) {
+        // medium green
+        fill = "rgba(80, 200, 90, 1)";
+      } else if (r > 0.18) {
+        // warm amber accent
+        fill = "rgba(255, 210, 80, 1)";
+      } else {
+        // unlit
+        fill = "rgba(18, 36, 24, 1)";
+      }
+      ctx.fillStyle = fill;
+      const pad = wW * 0.22;
+      ctx.fillRect(
+        Math.round(x * wW + pad),
+        Math.round(y * wH + pad),
+        Math.round(wW - pad * 2),
+        Math.round(wH * 0.5)
+      );
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.magFilter = THREE.NearestFilter; // crunchy pixel look
+  tex.minFilter = THREE.NearestMipmapNearestFilter;
+  tex.anisotropy = 1;
+  _cachedGreen = tex;
   return tex;
 }
 

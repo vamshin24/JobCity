@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { getWindowTexture } from "@/lib/buildingTex";
+import { getWindowTexture, getGreenWindowTexture } from "@/lib/buildingTex";
 
 /**
  * Multi-tier skyscraper with windows and a glow point-light when highlighted.
@@ -14,6 +14,7 @@ export default function Skyscraper({
   color = "#FFB24C",
   highlight = false,
   dim = false,
+  variant = "warm", // "warm" (Jobs City) or "green" (Applicants City)
   onClick,
   onPointerOver,
   onPointerOut,
@@ -29,7 +30,10 @@ export default function Skyscraper({
   const w2 = baseWidth * 0.78;
   const w3 = baseWidth * 0.58;
 
-  const tex = useMemo(() => getWindowTexture(), []);
+  const tex = useMemo(
+    () => (variant === "green" ? getGreenWindowTexture() : getWindowTexture()),
+    [variant]
+  );
   const baseColor = useMemo(() => new THREE.Color(color), [color]);
   // Dimmed skyscrapers should still be readable, not nearly black.
   const dimmedColor = useMemo(() => baseColor.clone().multiplyScalar(0.55), [baseColor]);
