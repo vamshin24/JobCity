@@ -62,10 +62,8 @@ async def list_jobs(
     if tech:
         tags = [t.strip() for t in tech.split(",") if t.strip()]
         if tags:
-            # case-insensitive match against the skills array
-            query["skills"] = {"$in": [{"$regex": f"^{literal_regex(t)}$", "$options": "i"} for t in tags]}
-            # Mongo `$in` doesn't accept regex docs; rewrite with $elemMatch+$or
-            del query["skills"]
+            # OR-match the canonical skill name (case-insensitive) against the
+            # ingested `skills` array. Composes with other filters via $and.
             query["$and"] = query.get("$and", []) + [
                 {
                     "$or": [
