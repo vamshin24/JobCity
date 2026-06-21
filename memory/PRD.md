@@ -143,6 +143,49 @@
 - 🟡 **3D building overflow** (SF/LA towers spilling past the West-Coast map edge) — deferred to next session per user. The spiral layout in `CompanyBuildings.jsx` needs a per-city radius cap or pyramid stacking when company count > ~12.
 - 🟡 Recruitee + Workable adapters work but their slug coverage in the curated list is weak (most 404). Adding more EU companies for Recruitee/Personio later.
 
+## Iteration 10 — Jun 21, 2026 (role categorization — software/robotics IC focus)
+
+User saw manager/talent/PM roles in Jobs City and asked: "I'm getting manager roles, I'm targeting software, robotics roles."
+
+### Classifier
+- ✅ **New `backend/ingest/classify.py`** — 12-bucket regex classifier with deterministic load-bearing pattern order:
+  1. **management** (Engineering Manager, Director, VP, Head of, CTO/CPO/COO etc.)
+  2. **business** (sales, marketing, talent, HR, recruiting, finance, legal, risk, audit, brand, ops, etc.)
+  3. **product** (PM, TPM, Program Manager, Product Marketing)
+  4. **design** (Product Designer, UX, UI Designer)
+  5. **robotics** (robotics, autonomy, SLAM, sensor fusion, controls, perception, mechatronics, manipulation, drone/UAV)
+  6. **ml** (ML/AI Engineer, Applied Scientist, Research Scientist, CV, NLP, LLM, RL)
+  7. **data** (Data Engineer, Analytics Engineer, BI, Data Scientist)
+  8. **security** (Security Engineer/Architect/Analyst, AppSec, InfoSec, Red Team, Cryptography)
+  9. **infra** (DevOps, SRE, Platform, Cloud, Reliability)
+  10. **hardware** (Hardware/Electrical/Mechanical Engineer, ASIC, FPGA, Firmware, Embedded)
+  11. **software** (generic SWE, Backend, Frontend, Full-Stack, Mobile, iOS, Android, Developer)
+  12. **business (catch-all)** — final fallback for Manager/Lead/Director without engineering qualifier.
+- ✅ **`TECHNICAL_IC`** frozenset = {software, robotics, ml, data, security, infra, hardware}. Default for the public `/api/jobs` listing + the 3D city.
+- ✅ Adapters (all 5 ATSes) call `classify(title)` → `NormalizedJob.category` at ingest time. New backfill script `scripts/reclassify_jobs.py` reclassifies existing rows after edits without re-fetching.
+
+### API contract
+- ✅ **`GET /api/jobs?category=…`** — new query param:
+  - omitted → defaults to TECHNICAL_IC (1336 jobs, was 3971 with everything)
+  - `category=all` → no gating
+  - `category=software,robotics` → CSV OR-match
+  - **invalid input** (e.g. `?category=garbage`) → falls back to TECHNICAL_IC default (does NOT silently bypass — fixed via iter-7 RCA)
+- ✅ Same param on **`GET /api/jobs-city/buildings`** so the 3D scene only shows tech roles.
+- ✅ **`GET /api/jobs/filters`** now returns a `categories: [{name, count}, …]` field sorted desc by count.
+- ✅ Shared helper `_build_category_filter()` in `routes/jobs.py` is the single source of truth for both endpoints — no drift possible.
+
+### Robotics company seed
+- ✅ Added 5 robotics companies to `ingest/companies.py`: Nuro, Wing (Greenhouse), 1X Technologies, Physical Intelligence, Figure (Ashby). Dropped 9 other robotics slugs that 404'd. Robotics role count went **4 → 22**.
+
+### Live numbers
+- Total ingested: **3971 active jobs from 42 companies, 28 US cities, 5 ATSes**
+- Category breakdown: business 1854 (excluded), software 862, management 314 (excluded), product 296 (excluded), ml 190, data 136, other 108 (excluded), security 77, design 63 (excluded), infra 45, robotics 22, hardware 4.
+- **Default city view: 1336 jobs across 12 cities** — managers, sales, recruiters, PMs filtered out.
+
+### Tests
+- ✅ `tests/test_classify.py` — 60+ assertions including boundary cases (`Engineering Manager` ≠ software, `Talent Operations - Program Manager` ≠ product, `ASIC Design Engineer` ≠ design, `Senior Manager, Market Management` = business).
+- ✅ Testing agent iter-7 found 1 HIGH bug (invalid category bypassed filter) — fixed, re-tested in iter-8 with 11/11 green.
+
 
 - `demo@jobcity.app` / `Demo123!` (applicant, 5 applications)
 - `admin@jobcity.app` / `Admin123!` (admin)
