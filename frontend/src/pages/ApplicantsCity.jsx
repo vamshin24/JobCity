@@ -102,6 +102,7 @@ export default function ApplicantsCityPage() {
     }
     toast.success(`Found ${match.display_name}.`);
     flyToBuilding(match, { zoom: "close" });
+    setQuery("");
   };
 
   const idToApplicant = useMemo(() => {
@@ -246,7 +247,8 @@ function ApplicantSidePanel({ applicant, onClose, onAddCompare, inCompareSet, co
   const skills = detail?.skills || [];
   const resumeUrl = detail?.resume_url || "";
   const title = (detail?.title || applicant.title || "").toUpperCase();
-  const handle = (detail?.github_username || applicant.display_name?.split(" ").join("").toLowerCase() || "user");
+  const githubUsername = detail?.github_username || "";
+  const handle = githubUsername || applicant.display_name?.split(" ").join("").toLowerCase() || "user";
   const commits = applicant.github_commits_30d || 0;
   const apps = applicant.floors;
 
@@ -394,11 +396,12 @@ function ApplicantSidePanel({ applicant, onClose, onAddCompare, inCompareSet, co
           >
             {inCompareSet ? "In compare" : compareFull ? "Compare full" : "+ Compare"}
           </Button>
-          {applicant.has_github && (
+          {applicant.has_github && githubUsername && (
             <a
-              href={`https://github.com/${detail?.github_username || handle}`}
+              href={`https://github.com/${githubUsername}`}
               target="_blank"
               rel="noopener noreferrer"
+              data-testid="applicant-github-link"
               className="block w-full text-center py-3 rounded font-mono text-xs tracking-widest uppercase bg-transparent border border-white/15 text-white hover:bg-white/5"
             >
               GitHub ↗

@@ -7,6 +7,7 @@ import { project } from "@/lib/projection";
 import { getWindowTexture, floorsToHeight } from "@/lib/buildingTex";
 
 const SKYSCRAPER_FLOOR_THRESHOLD = 8;
+const BEAM_COLOR = "#FFD23F";
 
 export default function CompanyBuildings({ cities, onCompanyClick, selected, query = "" }) {
   const [hoverKey, setHoverKey] = useState(null);
@@ -48,6 +49,15 @@ export default function CompanyBuildings({ cities, onCompanyClick, selected, que
   const selectedBuilding = buildings.find(
     (b) => selected && selected.id === b.id && selected.city === b.city
   );
+  // Solo-mode: dim everything when a company is selected (matches Applicants City spotlight)
+  const soloMode = !!selectedBuilding;
+  const matSoloRef = useRef();
+  useFrame((_, dt) => {
+    if (!matSoloRef.current) return;
+    const target = soloMode ? 0.55 : 1.0;
+    matSoloRef.current.opacity += (target - matSoloRef.current.opacity) * Math.min(1, dt * 4);
+    matSoloRef.current.transparent = matSoloRef.current.opacity < 0.999;
+  });
 
   return (
     <group>
@@ -55,11 +65,14 @@ export default function CompanyBuildings({ cities, onCompanyClick, selected, que
       <Instances limit={Math.max(regular.length, 8)} castShadow receiveShadow>
         <boxGeometry args={[1.6, 1, 1.6]} />
         <meshStandardMaterial
+          ref={matSoloRef}
           emissiveMap={tex}
           emissive="#222222"
           emissiveIntensity={0.65}
           roughness={0.55}
           metalness={0.1}
+          transparent
+          opacity={1}
         />
         {regular.map((b) => (
           <BuildingInstance
@@ -131,6 +144,11 @@ export default function CompanyBuildings({ cities, onCompanyClick, selected, que
         </Html>
       )}
 
+      {/* Golden focus beam over the selected company (matches Applicants City) */}
+      {selectedBuilding && (
+        <FocusBeam x={selectedBuilding.x} z={selectedBuilding.z} baseHeight={selectedBuilding.height} />
+      )}
+
       {cities.map((c) => {
         const [x, z] = project(c.lat, c.lng);
         return (
@@ -156,8 +174,7 @@ export default function CompanyBuildings({ cities, onCompanyClick, selected, que
   );
 }
 
-function BuildingInstance({ b, hovered, selected, dimmed, onPointerOver, onPointerOut, onClick }) {
-  const ref = useRef();
+function BuildingInstance({ b, hovered, selected, dimmed, onPointerOver, onPointerOut, onClick }) {  const ref = useRef();
   const targetScale = useMemo(() => new THREE.Vector3(1, 1, 1), []);
   const color = useMemo(() => new THREE.Color(b.color || "#FFB24C"), [b.color]);
   const dimmedColor = useMemo(() => color.clone().multiplyScalar(0.15), [color]);
@@ -190,5 +207,62 @@ function BuildingInstance({ b, hovered, selected, dimmed, onPointerOver, onPoint
         onClick?.();
       }}
     />
+  );
+}
+
+/**
+ * Pulsing golden beam + spinning octahedron + ground halo, anchored on
+ * the selected company tower. Mirrors the Applicants City focus pattern.
+ */
+function FocusBeam({ x, z, baseHeight }) {
+  const beamRef = useRef();
+  const diamondRef = useRef();
+  const beamH = 28;
+  const beamY = baseHeight + beamH / 2 + 0.5;
+  const diamondY = baseHeight + 2.2;
+
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    if (beamRef.current) {
+      beamRef.current.material.opacity = 0.55 + Math.sin(t * 2.2) * 0.12;
+    }
+    if (diamondRef.current) {
+      diamondRef.current.rotation.y = t * 0.9;
+      const s = 1 + Math.sin(t * 2) * 0.06;
+      diamondRef.current.scale.setScalar(s);
+    }
+  });
+
+  return (
+    <group position={[x, 0, z]}>
+      <mesh ref={beamRef} position={[0, beamY, 0]} renderOrder={5}>
+        <cylinderGeometry args={[0.18, 0.05, beamH, 8, 1, true]} />
+        <meshBasicMaterial
+          color={BEAM_COLOR}
+          transparent
+          opacity={0.6}
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      <mesh position={[0, beamY, 0]} renderOrder={6}>
+        <cylinderGeometry args={[0.06, 0.02, beamH, 6, 1, true]} />
+        <meshBasicMaterial color="#FFF1AC" transparent opacity={0.95} depthWrite={false} />
+      </mesh>
+      <mesh ref={diamondRef} position={[0, diamondY, 0]} rotation={[0, 0, Math.PI / 4]}>
+        <octahedronGeometry args={[0.5, 0]} />
+        <meshStandardMaterial
+          color={BEAM_COLOR}
+          emissive={BEAM_COLOR}
+          emissiveIntensity={1.6}
+          metalness={0.4}
+          roughness={0.2}
+        />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]}>
+        <ringGeometry args={[1.4, 2.2, 32]} />
+        <meshBasicMaterial color={BEAM_COLOR} transparent opacity={0.35} />
+      </mesh>
+    </group>
   );
 }

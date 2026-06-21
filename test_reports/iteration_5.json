@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration-5 backend+frontend verification PASSED end-to-end. All 9 pytest backend cases pass: jobs-city/buildings regression, applicants-city/buildings new response shape ({applicants, grid_size, total, returned, limit}) with limit=500 default, ?limit=10 caps correctly, ?limit=99999 -> 422 (FastAPI Query le=2000), ?limit=0 -> 422, /api/auth/login regression with demo@jobcity.test/Demo123!, /jobs/{id}/summary rate limit (20 cache-miss 502s then 429 with Retry-After=55), /jobs/{id}/match-score auth (401 unauth) + rate limit (10 cache-miss 502s then 429 with Retry-After=3598). All 14 frontend smoke flows pass: guest landing not bounced, explore-jobs-city-btn -> /jobs-city, search 'amazon'+Enter shows toast 'Flying to Amazon...' + job-detail-panel visible + input cleared, ESC closes panel, search 'zzzzz' shows 'No company found' toast and panel stays hidden, login & register guest-skip + close-X buttons all redirect to /, logged-in NavBar contains 'Jobs City'/'Applicants City'/'Edit profile' but NOT 'My Tower', nav-edit-profile testid present (nav-profile absent), /profile shows profile-completeness widget with profile-completeness-pct='60%' and all 5 profile-check-* rows (title, skills, resume, github, application).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration5.py",
+    "/app/test_reports/pytest/iteration_5.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "services/rate_limit.py: clean sliding-window implementation. Retry-After header correctly propagated via HTTPException(headers=...). For multi-process scale (gunicorn workers > 1) the in-memory _BUCKETS will diverge per worker; comment in file already calls this out — Redis swap recommended before horizontal scaling.",
+    "routes/jobs.py /jobs/{id}/summary: rate limit is only applied on cache-miss path (line 138-139) which is the correct design — cached returns are free. Verified: 502s on LLM failure do NOT cache (good — otherwise repeat hammering would be permanently broken).",
+    "routes/jobs.py /jobs/{id}/match-score: limit=10/3600s is aggressive but appropriate for cost control. user_id is used as bucket key explicitly (line 188) so per-user fairness is preserved.",
+    "routes/applicants.py /applicants-city/buildings: Query(ge=1, le=2000) gives FastAPI's built-in 422 for invalid limits — review_request mentioned '422 or 2000 cap', current behavior is 422 which is the stricter (and cleaner) of the two options. Default 500 is correctly applied. New response fields {grid_size, total, returned, limit} all populated.",
+    "frontend NavBar.jsx: 'My Tower' link cleanly removed; data-testid='nav-edit-profile' present, 'nav-profile' absent — exactly as spec.",
+    "frontend Profile.jsx ProfileCompleteness: SVG ring renders with circular progress arc, 5 checklist items, percentage displays '60%' for demo seed (title todo, skills done, resume todo, github done, application done = 3/5 = 60%). Matches review_request expectation exactly.",
+    "frontend JobsCity.jsx: search Enter -> fly + side panel works, input clears after Enter, ESC closes panel, no-match shows error toast — all four UX paths verified.",
+    "frontend Login.jsx/Register.jsx: guest-skip and close-X buttons both correctly route to '/' (Landing). Tested all 4 testids: login-continue-as-guest-btn, login-guest-close-btn, register-continue-as-guest-btn, register-guest-close-btn.",
+    "frontend authToken.js handleResponseError: guest 401 on /auth/me no longer hard-redirects (observed: landing page rendered cleanly with two 401 console errors visible but no redirect). Working as designed.",
+    "Note: backend/tests/backend_test.py (older pre-iter5 file) still uses DEMO_EMAIL='demo@jobcity.app' which is the OLD domain. seed.py now uses demo@jobcity.test. The older tests would fail against this env; the new test_iteration5.py uses the correct demo@jobcity.test. Suggest the main agent update DEMO_EMAIL in backend_test.py & test_iteration2.py to demo@jobcity.test for future regression runs.",
+    "EMERGENT_LLM_KEY is intentionally NOT configured for this iteration — confirmed by 502 responses on both summary and match-score LLM calls. Rate-limit logic was verified independently of LLM availability."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration5.py (new — 9 tests)"
+  ],
+  "success_rate": {
+    "backend": "100% (9/9 iteration-5 tests pass)",
+    "frontend": "100% (14/14 iteration-5 UI flows pass)"
+  },
+  "test_credentials": "demo@jobcity.test / Demo123! (working). admin@jobcity.test / Admin123! (not exercised this iteration).",
+  "seed_data_creation": "None — demo seed already in place from previous iterations; verified by /auth/login returning user_f1da9ee642d3 with email demo@jobcity.test and Demo Applicant identity.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 5 is GREEN. All 4 buckets shipped this session (A: nav cleanup + GitHub button conditional + search clear on Enter; B: rate limits + applicants-city limit cap; C: Profile completeness widget; D: Jobs City parity with Applicants City) are working in production. Backend rate limits are PROCESS-LOCAL — if backend ever scales to >1 supervisor worker, rate limits will diverge per worker (see code review). Recommended follow-ups: (1) update older test files (/app/backend/tests/backend_test.py and test_iteration2.py) to use demo@jobcity.test instead of demo@jobcity.app — they are dead-code against the current seed; (2) when EMERGENT_LLM_KEY is provisioned, redo summary/match-score tests with a happy path that asserts cached:true on second call. Test job IDs used: pulled dynamically via /api/jobs?limit=200. Frontend uses .test domain (https://ef17ee99-dde7-4098-84a9-83d74e28933a.preview.emergentagent.com) — frontend/.env REACT_APP_BACKEND_URL points to a DIFFERENT preview host (casual-access.preview.emergentagent.com), but both resolve to the same backend cluster; no action needed unless the main agent wants the env var to match the testing host.",
+  "rca_of_the_issue": "N/A — no bugs found in iteration-5 scope."
+}

@@ -143,6 +143,10 @@ export default function ProfilePage() {
         </div>
 
         {applicant && (
+          <ProfileCompleteness applicant={applicant} apps={apps} />
+        )}
+
+        {applicant && (
           <div className="mt-6">
             <Link
               data-testid="my-building-link"
@@ -363,6 +367,112 @@ function Stat({ label, value, color, testid }) {
       <div className="label-mono">{label}</div>
       <div className="font-mono text-2xl font-bold mt-1" style={{ color }}>
         {value}
+      </div>
+    </div>
+  );
+}
+
+function ProfileCompleteness({ applicant, apps }) {
+  const items = [
+    {
+      key: "title",
+      label: "Add a job title",
+      done: !!(applicant?.title && applicant.title.trim()),
+    },
+    {
+      key: "skills",
+      label: "List at least 3 skills",
+      done: (applicant?.skills?.length || 0) >= 3,
+    },
+    {
+      key: "resume",
+      label: "Add a resume link",
+      done: !!(applicant?.resume_url && applicant.resume_url.trim()),
+    },
+    {
+      key: "github",
+      label: "Link a GitHub account",
+      done: !!(applicant?.github_username && applicant.github_username.trim()),
+    },
+    {
+      key: "application",
+      label: "Submit your first application",
+      done: (apps?.length || 0) >= 1 || (applicant?.applications_count || 0) >= 1,
+    },
+  ];
+  const done = items.filter((i) => i.done).length;
+  const total = items.length;
+  const pct = Math.round((done / total) * 100);
+
+  // Stroke math for a 100×100 SVG circle, r=42 → circumference ≈ 263.89
+  const R = 42;
+  const C = 2 * Math.PI * R;
+  const dash = (pct / 100) * C;
+  const ringColor =
+    pct >= 100 ? "#00FFCC" : pct >= 60 ? "#FFB24C" : "#FF5F6D";
+
+  return (
+    <div
+      data-testid="profile-completeness"
+      className="mt-6 glass rounded-3xl p-6 flex items-center gap-6 flex-wrap"
+    >
+      <div className="relative w-[110px] h-[110px] shrink-0" data-testid="profile-completeness-ring">
+        <svg width="110" height="110" viewBox="0 0 100 100" className="-rotate-90">
+          <circle cx="50" cy="50" r={R} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8" />
+          <circle
+            cx="50"
+            cy="50"
+            r={R}
+            fill="none"
+            stroke={ringColor}
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeDasharray={`${dash} ${C}`}
+            style={{ transition: "stroke-dasharray 600ms ease-out, stroke 600ms ease-out" }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <div
+            data-testid="profile-completeness-pct"
+            className="font-[Unbounded] text-2xl font-black"
+            style={{ color: ringColor }}
+          >
+            {pct}%
+          </div>
+          <div className="label-mono text-[9px] text-white/50">DONE</div>
+        </div>
+      </div>
+      <div className="flex-1 min-w-[260px]">
+        <div className="label-mono text-white/55">PROFILE COMPLETENESS</div>
+        <h3 className="font-[Unbounded] text-lg font-bold mt-1">
+          {pct >= 100
+            ? "Tower fully lit ⚡"
+            : `${done} / ${total} complete — keep going`}
+        </h3>
+        <ul className="mt-3 grid sm:grid-cols-2 gap-x-4 gap-y-1.5">
+          {items.map((i) => (
+            <li
+              key={i.key}
+              data-testid={`profile-check-${i.key}`}
+              className={`flex items-center gap-2 text-sm font-mono ${
+                i.done ? "text-white/90" : "text-white/45"
+              }`}
+            >
+              <span
+                aria-hidden
+                className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold"
+                style={{
+                  background: i.done ? ringColor : "rgba(255,255,255,0.06)",
+                  color: i.done ? "#0a0a0a" : "rgba(255,255,255,0.35)",
+                  border: i.done ? "none" : "1px dashed rgba(255,255,255,0.18)",
+                }}
+              >
+                {i.done ? "✓" : ""}
+              </span>
+              <span className={i.done ? "line-through decoration-white/30" : ""}>{i.label}</span>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

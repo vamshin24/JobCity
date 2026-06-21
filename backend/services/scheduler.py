@@ -1,19 +1,22 @@
-"""Background scheduler that refreshes job feeds every 6 hours."""
+"""Background scheduler for periodic ATS job ingestion.
+
+Uses APScheduler's AsyncIOScheduler so we share the FastAPI event loop.
+The actual fetching/normalizing/upserting lives in ``ingest.runner``.
+"""
 from __future__ import annotations
 
-import asyncio
 import logging
-from datetime import datetime, timezone
+import os
+from datetime import datetime, timedelta, timezone
 
-logger = logging.getLogger(__name__)
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-REFRESH_INTERVAL_SECONDS = 6 * 60 * 60  # 6 hours
-
-_task: asyncio.Task | None = None
+logger = logging.getLogger("jobcity.scheduler")
+_scheduler: AsyncIOScheduler | None = None
 _state: dict = {
     "running": False,
     "last_run_at": None,
-    "last_counts": {},
+    "last_summary": None,
     "last_error": None,
 }
 
@@ -22,73 +25,59 @@ def state() -> dict:
     return dict(_state)
 
 
-async def _run_once(db) -> dict:
-    from services.ingestion import (
-        ingest_remoteok,
-        ingest_greenhouse,
-        ingest_lever,
-        ingest_yc,
+async def _run_job():
+    from ingest.runner import run_ingest
+    _state["running"] = True
+    try:
+        summary = await run_ingest()
+        _state["last_summary"] = summary
+        _state["last_run_at"] = datetime.now(timezone.utc).isoformat()
+        _state["last_error"] = None
+        logger.info("ingest run finished: %s", summary)
+    except Exception as e:  # noqa: BLE001
+        _state["last_error"] = str(e)
+        logger.exception("ingest run failed: %s", e)
+    finally:
+        _state["running"] = False
+
+
+def start() -> None:
+    """Boot the scheduler. Idempotent — calling twice is a no-op."""
+    global _scheduler
+    if _scheduler is not None:
+        return
+    if os.environ.get("INGEST_SCHEDULER_DISABLED") == "1":
+        logger.info("INGEST_SCHEDULER_DISABLED=1 — skipping background scheduler")
+        return
+
+    interval_hours = int(os.environ.get("INGEST_INTERVAL_HOURS", "6"))
+    startup_delay_s = int(os.environ.get("INGEST_STARTUP_DELAY_S", "30"))
+
+    _scheduler = AsyncIOScheduler(timezone="UTC")
+    _scheduler.add_job(
+        _run_job,
+        "interval",
+        hours=interval_hours,
+        id="ingest_periodic",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    _scheduler.add_job(
+        _run_job,
+        "date",
+        run_date=datetime.now(timezone.utc) + timedelta(seconds=startup_delay_s),
+        id="ingest_initial",
+        replace_existing=True,
+    )
+    _scheduler.start()
+    logger.info(
+        "scheduler started (initial in %ss, every %sh)", startup_delay_s, interval_hours
     )
 
-    counts: dict[str, int] = {}
-    try:
-        counts["remoteok"] = await ingest_remoteok(db)
-    except Exception as e:  # noqa: BLE001
-        logger.exception("remoteok ingestion failed")
-        counts["remoteok"] = 0
-    try:
-        counts["greenhouse"] = await ingest_greenhouse(
-            db, ["stripe", "airbnb", "vercel", "anthropic", "databricks", "openai", "discord"]
-        )
-    except Exception as e:  # noqa: BLE001
-        logger.exception("greenhouse ingestion failed")
-        counts["greenhouse"] = 0
-    try:
-        counts["lever"] = await ingest_lever(db, ["palantir", "reddit", "lyft", "stickermule", "kong"])
-    except Exception as e:  # noqa: BLE001
-        logger.exception("lever ingestion failed")
-        counts["lever"] = 0
-    try:
-        counts["yc"] = await ingest_yc(db, limit=80)
-    except Exception as e:  # noqa: BLE001
-        logger.exception("yc ingestion failed")
-        counts["yc"] = 0
-    return counts
 
-
-async def _loop():
-    from db import get_db
-
-    # Stagger the first run a bit so startup isn't slow
-    await asyncio.sleep(20)
-    while True:
-        db = get_db()
-        _state["running"] = True
-        try:
-            counts = await _run_once(db)
-            _state["last_counts"] = counts
-            _state["last_error"] = None
-            _state["last_run_at"] = datetime.now(timezone.utc).isoformat()
-            logger.info("scheduler: ingest counts %s", counts)
-        except Exception as e:  # noqa: BLE001
-            _state["last_error"] = str(e)
-            logger.exception("scheduler iteration failed")
-        finally:
-            _state["running"] = False
-        await asyncio.sleep(REFRESH_INTERVAL_SECONDS)
-
-
-def start():
-    global _task
-    if _task and not _task.done():
-        return _task
-    loop = asyncio.get_event_loop()
-    _task = loop.create_task(_loop())
-    return _task
-
-
-def stop():
-    global _task
-    if _task and not _task.done():
-        _task.cancel()
-    _task = None
+def stop() -> None:
+    global _scheduler
+    if _scheduler is not None:
+        _scheduler.shutdown(wait=False)
+        _scheduler = None

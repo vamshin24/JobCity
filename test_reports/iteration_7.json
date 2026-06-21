@@ -1,0 +1,46 @@
+{
+  "summary": "Iteration-7 backend verification: role-category classifier + TECHNICAL_IC filter on /api/jobs and /api/jobs-city/buildings. 16/17 pytest cases PASS against live preview backend. All spec numbers verified exactly: TECHNICAL_IC default total=1336 (categories: software=862, ml=190, data=136, security=77, infra=45, robotics=22, hardware=4); category=all returns full 3971; category=robotics returns exactly 22; category=management returns 314 matching filters facet; CSV (software,robotics) restricts correctly; compound (category=software&level=senior&tech=Python) still composes; /api/jobs/filters now exposes 'categories' field sorted desc by count alongside levels/sources/cities/tech; /api/jobs/{id} backward-compat verified (management job still fetchable, no gating); /api/jobs-city/buildings default total_jobs=1336 (12 cities), no business/management leak in spot-check, category=robotics surfaces Physical Intelligence + Nuro + Lyft + Scale AI; demo@jobcity.test/Demo123! auth regression green. ONE bug found: invalid category param (e.g. ?category=invalid_garbage) silently disables filtering and returns ALL 3971 jobs on BOTH /api/jobs and /api/jobs-city/buildings instead of falling back to TECHNICAL_IC default — this re-opens the leak path the iteration was supposed to close.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "/api/jobs?category=<invalid>  and  /api/jobs-city/buildings?category=<invalid>",
+        "issue": "When every comma-separated value is invalid (e.g. ?category=invalid_garbage), the sanitized `cats` list ends up empty and the code falls through with no `category` filter applied — silently returning ALL 3971 jobs (including business/management/sales/talent). Spec says: 'empty category list → default kicks back in. Either default tech list OR explicit empty results'. Current behavior is NEITHER and re-opens the manager/talent/PM leak the iteration was meant to close. Fix in routes/jobs.py (list_jobs) and routes/jobs.py (jobs_city_buildings): when cats becomes empty after sanitization, re-apply the TECHNICAL_IC default (or return an empty result set, whichever the product wants — be deterministic).",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration7.py",
+    "/app/test_reports/pytest/iteration_7.xml"
+  ],
+  "action_items": [
+    "Fix invalid-category fallthrough in routes/jobs.py for BOTH /api/jobs and /api/jobs-city/buildings. Suggested patch: after the `cats = [c for c in cats if c in ALL_CATEGORIES]` line, add `if not cats: query['category'] = {'$in': sorted(TECHNICAL_IC)}` (and same in jobs_city_buildings on `match`). This makes invalid input default to IC rather than 'all'.",
+    "Consider also stripping/validating earlier and returning 400 for fully-invalid input, so callers get a clear signal instead of a quiet default."
+  ],
+  "critical_code_review_comments": [
+    "routes/jobs.py list_jobs lines 75-81 and jobs_city_buildings lines 186-192 have the silent-fallthrough bug above. Same code shape in both — extract to a small helper `build_category_filter(category: Optional[str]) -> dict` so the rule is in ONE place and the bug can't drift between endpoints.",
+    "ingest/classify.py: the final 'business' catch-all regex (line 232+) is broad — title 'Lead Engineer' would match 'lead' before reaching the 'software' bucket if pattern order changed; today software runs first which keeps it safe, but a comment pinning ordering invariance would help future contributors. Add a top-of-file docstring note: 'PATTERN ORDER IS LOAD-BEARING — moving software above business catch-all would re-introduce manager/lead leaks.'",
+    "routes/jobs.py jobs/filters $group on $category yields _id=None for legacy rows without a category field; mapped to 'other' in the response (line 145). The reclassify_jobs.py backfill is run, so this should be 0 today, but worth a one-time integrity check: db.jobs.count_documents({'category': {'$exists': False}}) should be 0.",
+    "ALL_CATEGORIES set in classify.py (line 259) is recomputed by string union — fine, but consider making it a frozenset to signal immutability.",
+    "Mongo query for tech filter (lines 85-97) still constructs $and / $or — same observation as iter-6: clean refactor opportunity, not a bug."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration7.py (new — 17 tests across 7 classes covering classifier filter contracts)"
+  ],
+  "success_rate": {
+    "backend": "94% (16/17 iteration-7 tests pass; 1 fail = real bug, not a test flake)",
+    "frontend": "skipped per request"
+  },
+  "test_credentials": "demo@jobcity.test / Demo123! verified working via /api/auth/login",
+  "seed_data_creation": "None — relied on existing backfilled ingest data (3971 active jobs, category field populated on all rows via reclassify_jobs.py)",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Numbers as of this run: /api/jobs/filters categories = [business:1854, software:862, management:314, product:296, ml:190, data:136, other:108, security:77, design:63, infra:45, robotics:22, hardware:4] → TECHNICAL_IC sum = 1336. /api/jobs-city/buildings default surfaces 12 cities; category=all surfaces 28 cities. The single failing test (TestCsvCategory::test_invalid_category_no_500) IS the bug — once main agent fixes the fallthrough so invalid input → TECHNICAL_IC default (or empty), this test will pass as-is. Note: REACT_APP_BACKEND_URL in /app/frontend/.env is https://casual-access.preview.emergentagent.com (review_request mentioned a different host but the env is canonical, so tests use the env URL).",
+  "rca_of_the_issue": "routes/jobs.py:75-81 — when `category` is provided but ALL values are rejected by `c in ALL_CATEGORIES`, the resulting list `cats` is empty, the `if cats:` guard skips the filter assignment, AND the `if not category:` default branch was already skipped (because the raw param string is truthy). Net effect: query has no `category` constraint, so MongoDB returns every active job regardless of category. Identical pattern at routes/jobs.py:186-192 for /jobs-city/buildings. Reproduction: `curl '<BASE>/api/jobs?category=invalid_garbage&limit=1'` returns total=3971 (vs expected 1336 or 0). `curl '<BASE>/api/jobs-city/buildings?category=invalid_garbage'` returns 28 cities / 3971 total_jobs (vs expected 12 cities / 1336). Mitigation: add `if not cats: query['category'] = {'$in': sorted(TECHNICAL_IC)}` after the sanitization step in both endpoints, OR raise HTTPException(400) for fully-invalid category strings."
+}

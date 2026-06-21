@@ -263,13 +263,13 @@ async def run_seed(db, *, reset: bool = False) -> dict:
         for col in ("applications", "jobs", "applicants", "companies"):
             await db[col].delete_many({})
     await _seed_admin_and_demo(db)
-    companies = await _seed_companies(db)
-    jobs = await _seed_jobs(db)
     applicants = await _seed_demo_applicants(db)
     applications = await _seed_demo_applications(db)
+    # Jobs + companies are NOT seeded — they're fetched live from ATS APIs via
+    # `ingest.runner.run_ingest()` (CLI: `python -m ingest.cli run`).
     return {
-        "companies": companies,
-        "jobs": jobs,
+        "companies": 0,
+        "jobs": 0,
         "applicants": applicants,
         "applications": applications,
     }

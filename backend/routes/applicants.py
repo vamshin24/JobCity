@@ -66,11 +66,13 @@ async def get_applicant(applicant_id: str, request: Request):
 
 
 @router.get("/applicants-city/buildings")
-async def applicants_city_buildings():
+async def applicants_city_buildings(limit: int = Query(500, ge=1, le=2000)):
     """Return the 3D grid data for the Applicants City.
 
-    If two applicants hash to the same grid slot we spiral outward to the
-    nearest free slot so no two towers ever overlap.
+    For very large directories we cap the response at ``limit`` (default 500),
+    sorted by activity (applications_count desc) so the most relevant towers
+    always make the cut. Spiral collision-resolution still runs on the capped
+    set, so no two towers ever overlap.
     """
     db = get_db()
     cursor = db.applicants.find(
@@ -87,8 +89,9 @@ async def applicants_city_buildings():
             "building_seed": 1,
             "avatar_url": 1,
         },
-    )
-    items = await cursor.to_list(length=2000)
+    ).sort("applications_count", -1).limit(limit)
+    items = await cursor.to_list(length=limit)
+    total = await db.applicants.estimated_document_count()
 
     # Sort by applications desc so power users land on their original slot
     items.sort(key=lambda a: -int(a.get("applications_count", 0) or 0))
@@ -132,7 +135,7 @@ async def applicants_city_buildings():
                 "avatar_url": a.get("avatar_url", ""),
             }
         )
-    return {"applicants": out, "grid_size": GRID_SIZE}
+    return {"applicants": out, "grid_size": GRID_SIZE, "total": total, "returned": len(out), "limit": limit}
 
 
 class CompareIn(BaseModel):

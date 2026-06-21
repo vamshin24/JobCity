@@ -1,10 +1,9 @@
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 
 export default function NavBar() {
   const { user, logout } = useAuth();
-  const location = useLocation();
 
   const linkCls = ({ isActive }) =>
     `px-3 py-1.5 rounded-md text-sm tracking-tight transition ${
@@ -34,19 +33,6 @@ export default function NavBar() {
             </NavLink>
             {user && user !== false && (
               <>
-                <NavLink
-                  to="/applicants-city?navigate=me"
-                  data-testid="nav-profile"
-                  className={({ isActive }) =>
-                    `${linkCls({ isActive: false })} ${
-                      location.pathname === "/applicants-city" && location.search.includes("navigate=me")
-                        ? "bg-white/10 text-white"
-                        : ""
-                    }`
-                  }
-                >
-                  My Tower
-                </NavLink>
                 <NavLink to="/profile" data-testid="nav-edit-profile" className={linkCls}>
                   Edit profile
                 </NavLink>

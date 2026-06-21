@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration-6 backend verification GREEN. 20/20 pytest cases pass against the live preview backend covering: real ATS ingest data (total=3627 jobs from 38 companies, NO 'seed' sources, all sources in {ashby, greenhouse, lever, recruitee, workable}), new filters (role substring, tech OR-semantics with comma list, level=entry|mid|senior, posted_within=1h subset of 7d, source per-ATS), compound filter role=Engineer&tech=Python&level=senior, /api/jobs/filters facets endpoint (levels, sources, cities sorted, tech sorted desc by count), /api/jobs/{id} detail (job+company), /api/jobs-city/buildings returning real US cities (SF/NYC/Seattle/Austin) with non-empty companies arrays, demo@jobcity.test/Demo123! auth regression, /api/jobs/{id}/summary rate limit (25-call hammer → 429 with Retry-After header after 20 cache-miss 502s — EMERGENT_LLM_KEY intentionally unset), APScheduler logs show 'scheduler started' + 'ingest run finished' (2 successful runs in backend.err.log, latest: jobs_fetched=3627, jobs_updated=3627, jobs_expired=204), and CLI smoke `python -m ingest.cli verify` exits 0 with no traceback.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration6.py",
+    "/app/test_reports/pytest/iteration_6.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/jobs.py tech filter (lines 62-76): the code builds a $in regex doc, deletes it, and rewrites with $and+$or — the dead `query['skills'] = {...}` followed by `del query['skills']` is confusing. Recommend dropping the dead assignment and constructing the $or directly. Functionally correct (verified via test_tech_filter_or_semantics) but reads like a refactor leftover.",
+    "routes/jobs.py posted_within (lines 77-92): posted_at is queried as ISO string via $gte. Works because ingest writes ISO-8601 UTC strings which are lexicographically sortable. If any adapter ever writes a different format (e.g. without 'Z' / with offset), comparisons may silently break. Consider storing posted_at as datetime objects in Mongo for robustness.",
+    "routes/jobs.py /jobs/filters tech aggregation limits to 40 — fine for UI dropdown but worth documenting. Sort order verified desc by count.",
+    "ingest/scheduler logs only at INFO level into backend.err.log (supervisor merges stderr) — log line 'ingest run finished: {summary dict}' is parsed by tests; if the log format ever changes (e.g. structured JSON), test_scheduler_started_and_ingest_ran needs updating.",
+    "EMERGENT_LLM_KEY still NOT configured — /jobs/{id}/summary returns 502 on cache-miss as expected. Rate-limit logic still verifiable since 502s consume the bucket. Once the key is provisioned, add a happy-path test that asserts brief shape (summary, required_skills, nice_to_have, seniority) and cached=true on second call.",
+    "Multiple 'scheduler started' lines in backend.err.log are from previous supervisor restarts during this session — current single instance is healthy. Idempotent start() in services/scheduler.py prevents double-registration within a single process."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration6.py (new — 20 tests across 7 classes)"
+  ],
+  "success_rate": {
+    "backend": "100% (20/20 iteration-6 tests pass)",
+    "frontend": "skipped per request"
+  },
+  "test_credentials": "demo@jobcity.test / Demo123! verified working via /api/auth/login (returns token + user_id matching demo seed).",
+  "seed_data_creation": "None — existing ATS ingest already populated 3627 active jobs across 38 companies and 5 sources (ashby, greenhouse, lever, recruitee, workable). Verified no rows have source='seed'.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 6 is GREEN — backend is ready for open-source release with real ATS ingest. Tech tag top-5 today: Python(664), LLMs(651), SQL(560), ML(546), AWS(343). Sources observed: ashby, greenhouse, lever (recruitee/workable present in some runs but may be empty in a given snapshot — filters endpoint reflects current data). Filter compound (role=Engineer&tech=Python&level=senior) returns non-zero rows in current snapshot. /jobs/filters cities list contains 28 sorted US cities. Rate-limit test consumes 21+ API calls in ~5s — if running CI in parallel against the same backend, expect interference (the limit is process-local per the iter-5 review). When EMERGENT_LLM_KEY is provisioned, expand /summary tests to assert brief content + cached=true on second call. CLI verify command works and exits 0; do NOT call `python -m ingest.cli run` from a test — it triggers a full ATS ingest (~40s and external network calls).",
+  "rca_of_the_issue": "N/A — no bugs found; all 20 verification cases passed on first run."
+}
